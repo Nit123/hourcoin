@@ -1,3 +1,4 @@
 /target
 **/*.rs.bk
 Cargo.lock
+hourcoin_workspace.code-workspace
