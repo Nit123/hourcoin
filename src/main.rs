@@ -8,11 +8,11 @@ fn main() {
 																		inputs: vec![],
 																		outputs: vec![
 																			transaction::Output{
-																				value: 50,
+																				value: 1.5,
 																				to_addr: "Alice".to_owned(),
 																			},
 																			transaction::Output{
-																				value: 7,
+																				value: 0.5,
 																				to_addr: "Bob".to_owned(),
 																			}]}],);
 
@@ -31,7 +31,7 @@ fn main() {
             outputs: vec![
                 transaction::Output {
                     to_addr: "Chris".to_owned(),
-                    value: 536,
+                    value: 2.0,
                 },
             ],
         },
@@ -42,11 +42,11 @@ fn main() {
             outputs: vec![
                 transaction::Output {
                     to_addr: "Alice".to_owned(),
-                    value: 36,
+                    value: 0.25,
                 },
                 transaction::Output {
                     to_addr: "Bob".to_owned(),
-                    value: 12,
+                    value: 0.5,
                 },
             ],
         },
