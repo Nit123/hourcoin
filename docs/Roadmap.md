@@ -14,13 +14,14 @@ That being said, hourcoin's basic structure should be better than tinycoin and a
 **Things to Do** (points in *italics* have been completed)
 - *Create very basic blockchain in Rust using GeekLaunch's [youtube tutorial](https://www.youtube.com/playlist?list=PLwnSaD6BDfXL0RiKT_5nOIdxTxZWpPtAv) as a basis*
 - Add elements of tinycoin and improve aspects not included by GeekLaunch
-   - Validate difficulty of block rather than just accepting it as given
+   - *Validate difficulty of block rather than just accepting it as given (blocks no longer store difficulty since the chain will initially be centralized but the difficulty is now verified)*
    - Validate coinbase value for transaction (make it 2 hourcoin - one for taking an hour to accept transactions and another for waiving mining rights for another hour)
    - "Two otherwise identical outputs from different transactions are indistinguishable" -> most likely means adding hashing to transactions using a timestamp
    - Determine a way to broadcast transactions.
    - Seperate mining into a client script to be used (i.e. that way anyone can test mining on their own)
    - Create testing scripts to ensure that any changes to the block/mining code will still allow for genesis block to be accepted
    - Create node code that allows for networking to be used to verify/mining (specifically [node.py](https://github.com/JeremyRubin/tinycoin/blob/master/node.py)-like program)
+   - Make sure only certified people can change blockchain difficulty (might occur during next phase)
 
 The goal is for these things to be done by the end of June or at the latest July 15th. However, it's very hard to gauge deadlines as being reasonable without getting into the thick of it so might have to reevaluate later.
 

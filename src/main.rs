@@ -14,14 +14,14 @@ fn main() {
 																			transaction::Output{
 																				value: 7,
 																				to_addr: "Bob".to_owned(),
-																			}]}], difficulty);
+																			}]}],);
 
-	genesis_block.mine();
-	println!("Mined genesis block {:?}", &genesis_block);
+	genesis_block.mine(difficulty);
+	println!("Mined genesis block: \n {:?}", &genesis_block);
 
-	let mut last_hash = genesis_block.hash.clone();
+	let last_hash = genesis_block.hash.clone();
 
-	let mut blockchain = Blockchain::new();
+	let mut blockchain = Blockchain::new_with_diff(difficulty);
 
 	blockchain.update_with_block(genesis_block).expect("Failed to add genesis block");
 
@@ -50,13 +50,11 @@ fn main() {
                 },
             ],
         },
-    ], difficulty);
+    ],);
 
-	block.mine();
+	block.mine(blockchain.get_difficulty());
 
-    println!("Mined block {:?}", &block);
-
-    last_hash = block.hash.clone();
+    println!("Mined block\n {:?}", &block);
 
     blockchain.update_with_block(block).expect("Failed to add block");
 

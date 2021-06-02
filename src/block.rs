@@ -8,21 +8,23 @@ pub struct Block {
 	pub prev_block_hash: BlockHash, //prev block hash
 	pub nonce: u64, // for mining
 	pub transactions: Vec<Transaction>, // will change for transactions
-	pub difficulty: u128, // difficulty level to mine
+
 
 
 }
 
 impl Debug for Block {
 	fn fmt (&self, f: &mut Formatter) -> fmt::Result {
-		write!(f, "Block [{}]: {} at: {} with: {} nonce: {}", 
-			&self.index, &hex::encode(&self.hash), &self.timestamp, &self.transactions.len(), &self.nonce
-		)
+		// write!(f, "Block [{}]: {} at: {} with: {} nonce: {}", 
+		// 	&self.index, &hex::encode(&self.hash), &self.timestamp, &self.transactions.len(), &self.nonce
+		// )
+		write!(f, "[Block #{} - hash: {}, timestamp: {}, nonce: {}]: transactions: {}",
+				&self.index, &hex::encode(&self.hash), &self.timestamp, &self.nonce, &self.transactions.len())
 	}
 }
 
 impl Block { 
-	pub fn new(index: u32, timestamp: u128,  prev_block_hash: BlockHash, transactions: Vec<Transaction>, difficulty: u128) -> Self {
+	pub fn new(index: u32, timestamp: u128,  prev_block_hash: BlockHash, transactions: Vec<Transaction>,) -> Self {
 		Block {
 			index, 
 			timestamp, 
@@ -30,15 +32,14 @@ impl Block {
 			prev_block_hash, 
 			nonce: 0, 
 			transactions,
-			difficulty,
 		}
 	}
 
-	pub fn mine (&mut self){
+	pub fn mine (&mut self, difficulty: u128){
 		for nonce_attempt in 0..(u64::max_value()){
 			self.nonce = nonce_attempt;
 			let hash = self.hash();
-			if check_difficulty(&hash, self.difficulty){
+			if check_blockhash(&hash, difficulty){
 				self.hash = hash;
 				return;
 			}
@@ -60,13 +61,13 @@ impl Hashable for Block {
 									    .flat_map(|transaction| transaction.bytes())
 									    .collect::<Vec<u8>>()
 		);
-		bytes.extend(&u128_bytes(&self.difficulty));
 
 
 		bytes
 	}
 }
 
-pub fn check_difficulty (hash: &BlockHash, difficulty: u128) -> bool {
+pub fn check_blockhash (hash: &BlockHash, difficulty: u128) -> bool {
 	difficulty > difficulty_bytes_as_u128(&hash)
 }
+

@@ -4,6 +4,7 @@ use std::collections::HashSet;
 pub struct Blockchain {
 	pub blocks: Vec<Block>,
 	unspent_outputs: HashSet<BlockHash>,
+	difficulty: u128,
 }
 
 #[derive(Debug)]
@@ -16,6 +17,7 @@ pub enum BlockValidationErr {
 	InvalidInput,
 	InsufficientInputValue,
 	InvalidCoinbaseTransaction,
+	InvalidDifficultyUpdate,
 }
 
 impl Blockchain {
@@ -23,8 +25,33 @@ impl Blockchain {
 		Blockchain {
 			blocks: vec![],
 			unspent_outputs: HashSet::new(),
+			difficulty: 23, // this value must be updated immediatelty after  
 		}
 	}
+
+	pub fn new_with_diff (diff: u128) -> Self {
+		Blockchain {
+			blocks: vec![],
+			unspent_outputs: HashSet::new(),
+			difficulty: diff, // this value must be updated immediatelty after  
+		}
+	}
+
+	pub fn update_difficulty (&mut self, diff:u128) -> Result<(), BlockValidationErr> {
+		if self.difficulty < diff{
+			return Err(BlockValidationErr::InvalidDifficultyUpdate);
+		}
+		else{
+			self.difficulty = diff;
+			Ok(())
+		}
+
+	}
+
+	pub fn get_difficulty (&self) -> u128 {
+		self.difficulty
+	}
+
 	pub fn update_with_block (&mut self, block:Block) -> Result<(), BlockValidationErr> {
 		let i = self.blocks.len();
 		// block index test
@@ -32,7 +59,7 @@ impl Blockchain {
 			return Err(BlockValidationErr::MismatchedIndex);
 		}
 		// failed prescribed difficulty value...should make sure block is storing valid difficulty tho
-		else if !block::check_difficulty(&block.hash(), block.difficulty) {
+		else if !block::check_blockhash(&block.hash(), self.difficulty) {
 			return Err(BlockValidationErr::InvalidHash);
 		}
 		else if i != 0{
