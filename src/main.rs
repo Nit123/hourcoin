@@ -1,7 +1,9 @@
 use blockchainlib::*;
+use rand::Rng; // used to generate random u128 numbers for timestamp examples
 
 fn main() {
 	let difficulty = 0x0000FFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+    let mut rng = rand::thread_rng();
 
 	// example of genesis block with two coinbase transactions and example of adding to blockchain/mining
 	let mut genesis_block = Block::new(0, now(), vec![0; 32], vec![Transaction {
@@ -10,10 +12,12 @@ fn main() {
 																			transaction::Output{
 																				value: 1.5,
 																				to_addr: "Alice".to_owned(),
+                                                                                timestamp: now()
 																			},
 																			transaction::Output{
 																				value: 0.5,
 																				to_addr: "Bob".to_owned(),
+                                                                                timestamp: now()
 																			}]}],);
 
 	genesis_block.mine(difficulty);
@@ -26,12 +30,13 @@ fn main() {
 	blockchain.update_with_block(genesis_block).expect("Failed to add genesis block");
 
 	 let mut block = Block::new(1, now(), last_hash, vec![
-        Transaction {
+         Transaction {
             inputs: vec![ ],
             outputs: vec![
                 transaction::Output {
                     to_addr: "Chris".to_owned(),
                     value: 2.0,
+                    timestamp: rng.gen(),
                 },
             ],
         },
@@ -43,10 +48,12 @@ fn main() {
                 transaction::Output {
                     to_addr: "Alice".to_owned(),
                     value: 0.25,
+                    timestamp: rng.gen(),
                 },
                 transaction::Output {
                     to_addr: "Bob".to_owned(),
                     value: 0.5,
+                    timestamp: rng.gen(),
                 },
             ],
         },
@@ -57,5 +64,6 @@ fn main() {
     println!("Mined block\n {:?}", &block);
 
     blockchain.update_with_block(block).expect("Failed to add block");
+    
 
 }

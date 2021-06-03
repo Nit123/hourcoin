@@ -5,6 +5,7 @@ use std::collections::HashSet;
 pub struct Output {
 	pub to_addr: Address,
 	pub value: f64,
+	pub timestamp: u128,
 }
 
 impl Hashable for Output {
@@ -12,6 +13,7 @@ impl Hashable for Output {
 		let mut bytes = vec![];
 		bytes.extend(self.to_addr.as_bytes());
 		bytes.extend(&self.value.to_be_bytes());
+		bytes.extend(&self.timestamp.to_be_bytes());
 
 		bytes
 	}
