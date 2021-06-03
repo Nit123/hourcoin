@@ -17,7 +17,7 @@ That being said, hourcoin's basic structure should be better than tinycoin and a
    - *Validate difficulty of block rather than just accepting it as given (blocks no longer store difficulty since the chain will initially be centralized but the difficulty is now verified)*
    - *Validate coinbase value for transaction (make it 2 hourcoin - one for taking an hour to accept transactions and another for waiving mining rights for another hour)*
    - *"Two otherwise identical outputs from different transactions are indistinguishable" -> most likely means adding timestamps to transaction hashes (Assuming this is in fact including transaction timestamps and hashing them in a Merkle-tree fashion, this is correct but might need to make sure about this point later)* 
-   - Do some verification of transaction timestamps...somehow
+   - *Do some verification of transaction timestamps...somehow (checks that every output of a transaction occurs after every input)*
    - Determine a way to broadcast transactions.
    - Seperate mining into a client script to be used (i.e. that way anyone can test mining on their own)
    - Create testing scripts to ensure that any changes to the block/mining code will still allow for genesis block to be accepted

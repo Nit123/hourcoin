@@ -18,6 +18,7 @@ pub enum BlockValidationErr {
 	InsufficientInputValue,
 	InvalidCoinbaseTransaction,
 	InvalidDifficultyUpdate,
+	InvalidTransactionTimestamp
 }
 
 impl Blockchain {
@@ -95,6 +96,21 @@ impl Blockchain {
 				// second condition is that there is an input hash that has been used twice
 				if !(&input_hashes - &self.unspent_outputs).is_empty() || !(&input_hashes & &block_spent).is_empty(){
 					return Err(BlockValidationErr::InvalidInput);
+				}
+
+				let inputs = &transaction.inputs;
+				let outputs = &transaction.outputs;
+
+				for output in outputs {
+					let out_time = &output.timestamp; // time of output
+					for input in inputs {
+						let in_time = &input.timestamp;
+
+						if out_time < in_time {
+							// this is an error, you should have already gotten the input stuff before you can output it somewhere else
+							return Err(BlockValidationErr::InvalidTransactionTimestamp);
+						}
+					}
 				}
 
 				let input_sum = transaction.input_sum();
