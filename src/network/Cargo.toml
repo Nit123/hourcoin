@@ -1,0 +1,16 @@
+[package]
+name = "hourcoin-server"
+version = "0.1.0"
+authors = ["Nitesh <niteshkartha@yahoo.com>"]
+edition = "2018"
+
+[[bin]]
+name = "client"
+path = "client.rs"
+
+[[bin]]
+name = "server"
+path = "server.rs"
+
+[dependencies]
+packet = "0.1.4"
