@@ -1,39 +1,39 @@
-use std::net::{TcpStream};
-use std::io::{Read, Write};
-use std::str::from_utf8;
+use std::io;
+use std::net::SocketAddr;
 
-fn main() {
-    match TcpStream::connect("localhost:4776") {
-        Ok(mut stream) => {
-            println!("Successfully connected to server in port 4776");
+use structopt::StructOpt;
 
-            let msg = b"Hello!";
+use protocol::{Protocol, Request, Response, DEFAULT_SERVER_ADDR};
 
-            stream.write(msg).unwrap();
-            println!("Sent Hello, awaiting reply...");
+#[derive(Debug, StructOpt)]
+#[structopt(name = "client")]
+struct Args {
+    message: String,
+    // Jumble the message by how much (default = will not jumble)
+    #[structopt(short, long, default_value = "0")]
+    jumble: u16,
+    /// Server destination address
+    #[structopt(long, default_value = DEFAULT_SERVER_ADDR, global = true)]
+    addr: SocketAddr,
+}
 
-            let mut data = [0 as u8; 6];
-            match stream.read_exact(&mut data) {
-                Ok(_) => {
-                    if &data == msg {
-                        println!("Reply is ok!: {}", String::from_utf8_lossy(&data));
-                    }
-                    else {
-                        let text = from_utf8(&data).unwrap();
-                        println!("Unexpected reply: {}", text);
-                    }
-                },
+fn main() -> io::Result<()> {
+    let args = Args::from_args();
 
-                Err(e) => {
-                    println!("Failed to receive data: {}", e);
-                }
-            }
-        }, 
-
-        Err(e) => {
-            println!("Failed to connect: {}", e);
+    let req = if args.jumble > 0 {
+        Request::Jumble {
+            message: args.message,
+            amount: args.jumble,
         }
-    }
+    } else {
+        Request::Echo(args.message)
+    };
 
-    println!("Teriminated.");
+    Protocol::connect(args.addr)
+        .and_then(|mut client| {
+            client.send_message(&req)?;
+            Ok(client)
+        })
+        .and_then(|mut client| client.read_message::<Response>())
+        .map(|resp| println!("{}", resp.message()))
 }

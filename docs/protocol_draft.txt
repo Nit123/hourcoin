@@ -1,0 +1,12 @@
+hello message -> miner to hub
+confirm hello message -> hub to miner
+
+connection confirmed (since centralized, all transactions go to hub and hub sends it to miner to form into a block)
+transact -> hub to miner (hub still stores transaction until added to confirmed block)
+
+**** time goes by ***
+(new hour begins)
+hub opens new port for block candidates
+miner sends blockadd message with the following packet structure:
+
+Block header

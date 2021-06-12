@@ -1,5 +1,5 @@
 [package]
-name = "hourcoin-server"
+name = "hourcoin_server"
 version = "0.1.0"
 authors = ["Nitesh <niteshkartha@yahoo.com>"]
 edition = "2018"
@@ -12,5 +12,10 @@ path = "client.rs"
 name = "server"
 path = "server.rs"
 
+[lib]
+name = "protocol"
+path = "lib.rs"
+
 [dependencies]
-packet = "0.1.4"
+byteorder = "1.3.4"
+structopt = "0.3.14"

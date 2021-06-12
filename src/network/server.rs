@@ -1,46 +1,58 @@
-// Basis for server application from https://riptutorial.com/rust/example/4404/a-simple-tcp-client-and-server-application--echo
+use std::io;
+use std::net::{SocketAddr, TcpListener, TcpStream};
 
-use std::thread;
-use std::net::{TcpListener, TcpStream, Shutdown};
-use std::io::{Read, Write};
+use structopt::StructOpt;
 
-fn handle_client(mut stream: TcpStream){
-    let mut data = [0 as u8; 50]; // using 50 byte buffer
-    while match stream.read(&mut data) {
-        Ok(size) => {
-            // echo the whole message
-            stream.write(&data[0..size]).unwrap();
-            true
-        },
-        Err(_) => {
-            println!("An error occurs, terminiating connection with {}", stream.peer_addr().unwrap());
-            stream.shutdown(Shutdown::Both).unwrap();
-            false
-        }
-    } {}
+use protocol::{Protocol, Request, Response, DEFAULT_SERVER_ADDR};
+
+#[derive(Debug, StructOpt)]
+#[structopt(name = "server")]
+struct Args {
+    /// Service listening address
+    #[structopt(long, default_value = DEFAULT_SERVER_ADDR, global = true)]
+    addr: SocketAddr,
 }
 
-fn main() {
-    let listener = TcpListener::bind("0.0.0.0:4776").unwrap(); 
-    // accept connections and process them, spawning a new thread for each one
-    println!("Server listening on port 4776");
-    for stream in listener.incoming() {
-        match stream {
-            Ok(stream) => {
-                println!("New connection: {}", stream.peer_addr().unwrap());
-                thread::spawn(move|| {
-                    // connection succeeded
-                    handle_client(stream);
-                });
-            }
+/// Given a TcpStream:
+/// - Deserialize the request
+/// - Handle the request
+/// - Serialize and write the Response to the stream
+fn handle_connection(stream: TcpStream) -> io::Result<()> {
+    let peer_addr = stream.peer_addr().expect("Stream has peer_addr");
+    let mut protocol = Protocol::with_stream(stream)?;
 
-            Err(e) => {
-                println!("Error: {}", e);
-                // connection failed
-            }
+    let request = protocol.read_message::<Request>()?;
+    eprintln!("Incoming {:?} [{}]", request, peer_addr);
+    let resp = match request {
+        Request::Echo(message) => Response(format!("'{}' from the other side!", message)),
+        Request::Jumble { message, amount } => Response(jumble_message(&message, amount)),
+    };
+
+    protocol.send_message(&resp)
+}
+
+/// Shake the characters around a little bit
+fn jumble_message(message: &str, amount: u16) -> String {
+    let mut chars: Vec<char> = message.chars().collect();
+    // Do some jumbling
+    for i in 1..=amount as usize {
+        let shuffle = i % chars.len();
+        chars.swap(0, shuffle);
+    }
+    chars.into_iter().collect()
+}
+
+fn main() -> io::Result<()> {
+    let args = Args::from_args();
+    eprintln!("Starting server on '{}'", args.addr);
+
+    let listener = TcpListener::bind(args.addr)?;
+    for stream in listener.incoming() {
+        if let Ok(stream) = stream {
+            std::thread::spawn(move || {
+                handle_connection(stream).map_err(|e| eprintln!("Error: {}", e))
+            });
         }
     }
-
-    // close the socket server
-    drop(listener);
+    Ok(())
 }
