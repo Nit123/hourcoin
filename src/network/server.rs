@@ -3,7 +3,7 @@ use std::net::{SocketAddr, TcpListener, TcpStream};
 
 use structopt::StructOpt;
 
-use protocol::{Protocol, Request, Response, DEFAULT_SERVER_ADDR};
+use protocol::{Protocol, Request, DEFAULT_SERVER_ADDR};
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "server")]
@@ -21,25 +21,11 @@ fn handle_connection(stream: TcpStream) -> io::Result<()> {
     let peer_addr = stream.peer_addr().expect("Stream has peer_addr");
     let mut protocol = Protocol::with_stream(stream)?;
 
-    let request = protocol.read_message::<Request>()?;
+    let request = protocol.read_message().unwrap();
     eprintln!("Incoming {:?} [{}]", request, peer_addr);
-    let resp = match request {
-        Request::Echo(message) => Response(format!("'{}' from the other side!", message)),
-        Request::Jumble { message, amount } => Response(jumble_message(&message, amount)),
-    };
-
-    protocol.send_message(&resp)
-}
-
-/// Shake the characters around a little bit
-fn jumble_message(message: &str, amount: u16) -> String {
-    let mut chars: Vec<char> = message.chars().collect();
-    // Do some jumbling
-    for i in 1..=amount as usize {
-        let shuffle = i % chars.len();
-        chars.swap(0, shuffle);
-    }
-    chars.into_iter().collect()
+    let resp = Request::new_server_request(request.read_request_num() + 1, request.read_timestamp_send());
+    protocol.send_message(resp);
+    Ok(())
 }
 
 fn main() -> io::Result<()> {

@@ -1,269 +1,122 @@
-//! Message Serialization/Deserialization (Protocol) for client <-> server communication
-//!
-//! Ideally you would use some existing Serialization/Deserialization,
-//! but this is here to see what's going on under the hood.
-//!
-//! ## Libraries for serialization/deserialization:
-//! [Serde](https://docs.rs/serde/1.0.114/serde/index.html)
-//! [tokio_util::codec](https://docs.rs/tokio-util/0.3.1/tokio_util/codec/index.html)
-//! [bincode](https://github.com/servo/bincode)
-
-use std::convert::From;
-use std::io::{self, Read, Write};
+use serde::{Deserialize, Serialize};
 use std::net::{SocketAddr, TcpStream};
-
-use byteorder::{NetworkEndian, ReadBytesExt, WriteBytesExt};
+use std::io::{BufReader, Result, Error, ErrorKind};
+use byteorder::{NetworkEndian, WriteBytesExt, ReadBytesExt};
+use std::convert::TryInto;
+use std::io::prelude::*;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 pub const DEFAULT_SERVER_ADDR: &str = "127.0.0.1:4000";
 
-/// Trait for something that can be converted to bytes (&[u8])
-pub trait Serialize {
-    /// Serialize to a `Write`able buffer
-    fn serialize(&self, buf: &mut impl Write) -> io::Result<usize>;
-}
-/// Trait for something that can be converted from bytes (&[u8])
-pub trait Deserialize {
-    /// The type that this deserializes to
-    type Output;
-
-    /// Deserialize from a `Read`able buffer
-    fn deserialize(buf: &mut impl Read) -> io::Result<Self::Output>;
+pub fn now() -> u128 {
+	let duration = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+	duration.as_secs() as u128 * 1000 + duration.subsec_millis() as u128
 }
 
-/// Request object (client -> server)
-#[derive(Debug)]
-pub enum Request {
-    /// Echo a message back
-    Echo(String),
-    /// Jumble up a message with given amount of entropy before echoing
-    Jumble { message: String, amount: u16 },
+#[derive(Serialize, Deserialize, PartialEq, Debug, Copy, Clone)]
+pub struct Request {
+    request_num: u64,
+    timestamp_send: u128,
+    timestamp_receive: u128,
 }
 
-/// Encode the Request type as a single byte (as long as we don't exceed 255 types)
-///
-/// We use `&Request` since we don't actually need to own or mutate the request fields
-impl From<&Request> for u8 {
-    fn from(req: &Request) -> Self {
-        match req {
-            Request::Echo(_) => 1,
-            Request::Jumble { .. } => 2,
-        }
-    }
-}
-
-/// Message format for Request is:
-/// ```ignore
-/// |    u8    |     u16     |     [u8]      | ... u16    |   ... [u8]         |
-/// |   type   |    length   |  value bytes  | ... length |   ... value bytes  |
-/// ```
-///
-/// Starts with a type, and then is an arbitrary length of (length/bytes) tuples
 impl Request {
-    /// View the message portion of this request
-    pub fn message(&self) -> &str {
-        match self {
-            Request::Echo(message) => &message,
-            Request::Jumble { message, .. } => &message,
-        }
+    pub fn new_client_request(request_num: u64) -> Self {
+        Self{request_num, timestamp_send: now(), timestamp_receive: 0 as u128}
+    }
+
+    pub fn new_server_request(request_num: u64, timestamp_receive: u128) -> Self{
+        Self{request_num, timestamp_send: now(), timestamp_receive}
+    }
+
+    pub fn read_request_num(self) -> u64 {
+        return self.request_num;
+    }
+
+    pub fn read_timestamp_recieve(self) -> u128 {
+        return self.timestamp_receive;
+    }
+
+    pub fn read_timestamp_send(self) -> u128 {
+        return self.timestamp_send;
     }
 }
 
-impl Serialize for Request {
-    /// Serialize Request to bytes (to send to server)
-    fn serialize(&self, buf: &mut impl Write) -> io::Result<usize> {
-        buf.write_u8(self.into())?; // Message Type byte
-        let mut bytes_written: usize = 1;
-        match self {
-            Request::Echo(message) => {
-                // Write the variable length message string, preceded by it's length
-                let message = message.as_bytes();
-                buf.write_u16::<NetworkEndian>(message.len() as u16)?;
-                buf.write_all(&message)?;
-                bytes_written += 2 + message.len();
-            }
-            Request::Jumble { message, amount } => {
-                // Write the variable length message string, preceded by it's length
-                let message_bytes = message.as_bytes();
-                buf.write_u16::<NetworkEndian>(message_bytes.len() as u16)?;
-                buf.write_all(&message_bytes)?;
-                bytes_written += 2 + message.len();
 
-                // We know that `amount` is always 2 bytes long, but are adding
-                // the length here to stay consistent
-                buf.write_u16::<NetworkEndian>(2)?;
-                buf.write_u16::<NetworkEndian>(*amount)?;
-                bytes_written += 4;
-            }
-        }
-        Ok(bytes_written)
-    }
+// theoretically turns vector into equivalent array...but you know, it can mess things up
+fn demo<T, const N: usize>(v: Vec<T>) -> [T; N] {
+    v.try_into()
+        .unwrap_or_else(|v: Vec<T>| panic!("Expected a Vec of length {} but it was {}", N, v.len()))
 }
 
-impl Deserialize for Request {
-    type Output = Request;
-
-    /// Deserialize Request from bytes (to receive from TcpStream)
-    fn deserialize(mut buf: &mut impl Read) -> io::Result<Self::Output> {
-        match buf.read_u8()? {
-            // Echo
-            1 => Ok(Request::Echo(extract_string(&mut buf)?)),
-            // Jumble
-            2 => {
-                let message = extract_string(&mut buf)?;
-                let _amount_len = buf.read_u16::<NetworkEndian>()?;
-                let amount = buf.read_u16::<NetworkEndian>()?;
-                Ok(Request::Jumble { message, amount })
-            }
-            _ => Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Invalid Request Type",
-            )),
-        }
-    }
-}
-
-/// Response object from server
-///
-/// In the real-world, this would likely be an enum as well to signal Success vs. Error
-/// But since we're showing that capability with the `Request` struct, we'll keep this one simple
-#[derive(Debug)]
-pub struct Response(pub String);
-
-/// Message format for Response is:
-/// ```ignore
-/// |     u16     |     [u8]      |
-/// |    length   |  value bytes  |
-/// ```
-///
-impl Response {
-    /// Create a new response with a given message
-    pub fn new(message: String) -> Self {
-        Self(message)
-    }
-
-    /// Get the response message value
-    pub fn message(&self) -> &str {
-        &self.0
-    }
-}
-
-impl Serialize for Response {
-    /// Serialize Response to bytes (to send to client)
-    ///
-    /// Returns the number of bytes written
-    fn serialize(&self, buf: &mut impl Write) -> io::Result<usize> {
-        let resp_bytes = self.0.as_bytes();
-        buf.write_u16::<NetworkEndian>(resp_bytes.len() as u16)?;
-        buf.write_all(&resp_bytes)?;
-        Ok(3 + resp_bytes.len()) // Type + len + bytes
-    }
-}
-
-impl Deserialize for Response {
-    type Output = Response;
-    /// Deserialize Response to bytes (to receive from server)
-    fn deserialize(mut buf: &mut impl Read) -> io::Result<Self::Output> {
-        let value = extract_string(&mut buf)?;
-        Ok(Response(value))
-    }
-}
-
-/// From a given readable buffer, read the next length (u16) and extract the string bytes
-fn extract_string(buf: &mut impl Read) -> io::Result<String> {
-    // byteorder ReadBytesExt
-    let length = buf.read_u16::<NetworkEndian>()?;
-    // Given the length of our string, only read in that quantity of bytes
-    let mut bytes = vec![0u8; length as usize];
-    buf.read_exact(&mut bytes)?;
-    // And attempt to decode it as UTF8
-    String::from_utf8(bytes).map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid utf8"))
-}
-
-/// Abstracted Protocol that wraps a TcpStream and manages
+// Abstracted Protocol that wraps a TcpStream and manages
 /// sending & receiving of messages
 pub struct Protocol {
-    reader: io::BufReader<TcpStream>,
+    reader: BufReader<TcpStream>,
     stream: TcpStream,
 }
-
 impl Protocol {
     /// Wrap a TcpStream with Protocol
-    pub fn with_stream(stream: TcpStream) -> io::Result<Self> {
+    pub fn with_stream(stream: TcpStream) -> Result<Self> {
         Ok(Self {
-            reader: io::BufReader::new(stream.try_clone()?),
+            reader: BufReader::new(stream.try_clone()?),
             stream,
         })
     }
 
+
+
     /// Establish a connection, wrap stream in BufReader/Writer
-    pub fn connect(dest: SocketAddr) -> io::Result<Self> {
+    pub fn connect(dest: SocketAddr) -> Result<Self> {
         let stream = TcpStream::connect(dest)?;
         eprintln!("Connecting to {}", dest);
         Self::with_stream(stream)
     }
 
     /// Serialize a message to the server and write it to the TcpStream
-    pub fn send_message(&mut self, message: &impl Serialize) -> io::Result<()> {
-        message.serialize(&mut self.stream)?;
-        self.stream.flush()
+    pub fn send_message(&mut self, message: Request) -> Result<()> {
+        let mut serial_message: Vec<u8> = bincode::serialize(&message).unwrap();
+        self.stream.write_u16::<NetworkEndian>(serial_message.len() as u16);
+        self.stream.write_all(&mut serial_message);
+        self.stream.flush();
+        Ok(())
     }
 
     /// Read a message from the inner TcpStream
     ///
-    /// NOTE: Will block until there's data to read (or deserialize fails with io::ErrorKind::Interrupted)
-    ///       so only use when a message is expected to arrive
-    pub fn read_message<T: Deserialize>(&mut self) -> io::Result<T::Output> {
-        T::deserialize(&mut self.reader)
+    // Odd # = response from server so two timestamps, Even # = request from client so one timestamp
+    pub fn read_message(&mut self) -> Result<Request> {
+        let length = self.reader.read_u16::<NetworkEndian>()?; // length of the serialization
+        let mut request_buf = vec![0u8; 8];
+        //Ok(Response{message: response_str})
+        self.reader.read_exact(&mut request_buf); // bytes for request number
+        let mut time_buf = vec![0u8; 16];
+        self.reader.read_exact(&mut time_buf);
+
+        let mut request_num = u64::from_le_bytes(demo(request_buf));
+        let mut time2_buf = vec![0u8; 16];
+        let timestamp2: u128;
+        self.reader.read_exact(&mut time2_buf);
+        println!("request_num: {}", request_num);
+        if request_num % 2 == 1 {
+            // client so no third time stamp
+            println!("Client packet");
+            timestamp2 = u128::from_le_bytes(demo(time2_buf));
+            println!("timestamp2: {}", timestamp2);
+            assert_eq!(0 as u128, timestamp2); // should be 0
+        }
+        else {
+            // server so third timestamp matters
+            timestamp2 = u128::from_le_bytes(demo(time2_buf));
+            assert_ne!(0 as u128, timestamp2);
+        }
+
+        let timestamp = u128::from_be_bytes(demo(time_buf));  // server's timestamp, we don't care
+        //assert_ne!(0 as u128, timestamp);
+        return Ok(Request{request_num, timestamp_send: timestamp, timestamp_receive: timestamp2});
+              
     }
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
-    use std::io::Cursor;
-
-    #[test]
-    fn test_request_echo_roundtrip() {
-        let req = Request::Echo(String::from("Hello"));
-
-        let mut bytes: Vec<u8> = vec![];
-        req.serialize(&mut bytes).unwrap();
-
-        let mut reader = Cursor::new(bytes);
-        let roundtrip_req = Request::deserialize(&mut reader).unwrap();
-
-        assert!(matches!(roundtrip_req, Request::Echo(_)));
-        assert_eq!(roundtrip_req.message(), "Hello");
-    }
-
-    #[test]
-    fn test_request_jumble_roundtrip() {
-        let req = Request::Jumble {
-            message: String::from("Hello"),
-            amount: 42,
-        };
-
-        let mut bytes: Vec<u8> = vec![];
-        req.serialize(&mut bytes).unwrap();
-
-        let mut reader = Cursor::new(bytes);
-        let roundtrip_req = Request::deserialize(&mut reader).unwrap();
-
-        assert!(matches!(roundtrip_req, Request::Jumble { .. }));
-        assert_eq!(roundtrip_req.message(), "Hello");
-    }
-
-    #[test]
-    fn test_response_roundtrip() {
-        let resp = Response(String::from("Hello"));
-
-        let mut bytes: Vec<u8> = vec![];
-        resp.serialize(&mut bytes).unwrap();
-
-        let mut reader = Cursor::new(bytes);
-        let roundtrip_resp = Response::deserialize(&mut reader).unwrap();
-
-        assert!(matches!(roundtrip_resp, Response(_)));
-        assert_eq!(roundtrip_resp.0, "Hello");
-    }
-}
+// client : Odd request num, timestamp_send, timestamp_receive = 0
+// server: Even request num, timestamp_send, timestamp_receive != 0

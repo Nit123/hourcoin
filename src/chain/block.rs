@@ -4,8 +4,8 @@ use super::*;
 pub struct Block {
 	pub index: u32, // block index
 	pub timestamp: u128, // timestamp of when block is created
-	pub hash: BlockHash, // current block hash
-	pub prev_block_hash: BlockHash, //prev block hash
+	pub hash: Hash, // current block hash
+	pub prev_block_hash: Hash, //prev block hash
 	pub nonce: u64, // for mining
 	pub transactions: Vec<Transaction>, // will change for transactions
 
@@ -24,7 +24,7 @@ impl Debug for Block {
 }
 
 impl Block { 
-	pub fn new(index: u32, timestamp: u128,  prev_block_hash: BlockHash, transactions: Vec<Transaction>,) -> Self {
+	pub fn new(index: u32, timestamp: u128,  prev_block_hash: Hash, transactions: Vec<Transaction>,) -> Self {
 		Block {
 			index, 
 			timestamp, 
@@ -67,7 +67,7 @@ impl Hashable for Block {
 	}
 }
 
-pub fn check_blockhash (hash: &BlockHash, difficulty: u128) -> bool {
+pub fn check_blockhash (hash: &Hash, difficulty: u128) -> bool {
 	difficulty > difficulty_bytes_as_u128(&hash)
 }
 

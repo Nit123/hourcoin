@@ -37,16 +37,16 @@ impl Transaction {
 			.sum()
 	}
 
-	pub fn input_hashes (&self) -> HashSet<BlockHash> {
+	pub fn input_hashes (&self) -> HashSet<Hash> {
 		self.inputs.iter()
 			.map(|input| input.hash())
-			.collect::<HashSet<BlockHash>>()
+			.collect::<HashSet<Hash>>()
 	}
 
-	pub fn output_hashes (&self) -> HashSet<BlockHash> {
+	pub fn output_hashes (&self) -> HashSet<Hash> {
 		self.outputs.iter()
 			.map(|output| output.hash())
-			.collect::<HashSet<BlockHash>>()
+			.collect::<HashSet<Hash>>()
 	}
 
 	pub fn is_coinbase (&self) -> bool {
